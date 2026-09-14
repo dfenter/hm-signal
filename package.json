@@ -1,0 +1,17 @@
+{
+  "name": "hm-signal",
+  "version": "1.0.0",
+  "description": "WebRTC signaling relay for Horde Meridian 2-player co-op",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
