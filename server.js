@@ -52,6 +52,26 @@ function otherPeer(room, ws) {
   return room.host === ws ? room.guest : room.host;
 }
 
+// Shared TTL-expiry logic, factored out so tests can invoke it directly
+// instead of waiting out ROOM_TTL_MS.
+function expireRoom(code) {
+  const room = rooms.get(code);
+  if (!room) return;
+  // Once a guest has joined, signaling is done and the peers talk directly
+  // over their DataChannels; the relay's own TTL sweep must not send
+  // peer-left for a live paired run. Just drop the room bookkeeping
+  // silently. Unpaired rooms (host still waiting) still notify so the host
+  // page doesn't wait forever.
+  if (room.guest) {
+    room.host.roomCode = null;
+    room.guest.roomCode = null;
+    destroyRoom(code);
+    return;
+  }
+  if (room.host) { room.host.roomCode = null; send(room.host, { t: 'peer-left' }); }
+  destroyRoom(code);
+}
+
 function handleLeave(ws) {
   const code = ws.roomCode;
   if (!code) return;
@@ -122,14 +142,7 @@ wss.on('connection', (ws) => {
           return;
         }
         const code = genCode();
-        const timer = setTimeout(() => {
-          const room = rooms.get(code);
-          if (room) {
-            if (room.host) { room.host.roomCode = null; }
-            if (room.guest) { send(room.guest, { t: 'peer-left' }); room.guest.roomCode = null; }
-            destroyRoom(code);
-          }
-        }, ROOM_TTL_MS);
+        const timer = setTimeout(() => expireRoom(code), ROOM_TTL_MS);
         timer.unref();
         rooms.set(code, { host: ws, guest: null, createdAt: Date.now(), timer });
         ws.roomCode = code;
@@ -202,4 +215,4 @@ if (isMain) {
   });
 }
 
-export { server, wss, rooms };
+export { server, wss, rooms, expireRoom };
